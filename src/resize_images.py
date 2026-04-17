@@ -1,20 +1,27 @@
 import cv2
 import os
 
-input_folder = r"C:\projet_cv\data\frames_s4"
-output_folder = r"C:\projet_cv\data\frames_resized"
+input_dir = r"C:\projet_cv\data\organized_s4"
+output_dir = r"C:\projet_cv\data\resized_s4"
 
-os.makedirs(output_folder, exist_ok=True)
+classes = ["safe_driving", "drinking", "reach_side"]
 
-for root, dirs, files in os.walk(input_folder):
-    for f in files:
-        if f.endswith(".jpg"):
-            path = os.path.join(root, f)
-            img = cv2.imread(path)
+for class_name in classes:
+    input_folder = os.path.join(input_dir, class_name)
+    output_folder = os.path.join(output_dir, class_name)
+    os.makedirs(output_folder, exist_ok=True)
 
-            img_resized = cv2.resize(img, (224, 224))
+    files = os.listdir(input_folder)
+    print(f"Redimensionnement de {class_name} : {len(files)} images...")
 
-            save_path = os.path.join(output_folder, f)
-            cv2.imwrite(save_path, img_resized)
+    for img_file in files:
+        if not img_file.endswith('.jpg'):
+            continue
+        path = os.path.join(input_folder, img_file)
+        img = cv2.imread(path)
+        img_resized = cv2.resize(img, (224, 224))
+        cv2.imwrite(os.path.join(output_folder, img_file), img_resized)
 
-print("Resize terminé ✔️")
+    print(f"✅ {class_name} terminé !")
+
+print("\n✅ Toutes les images sont en 224x224 !")
