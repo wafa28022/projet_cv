@@ -1,0 +1,7 @@
+venv/
+data/raw/*.mp4
+data/raw/*.avi
+data/processed/frames/
+*.pyc
+__pycache__/
+.ipynb_checkpoints/
