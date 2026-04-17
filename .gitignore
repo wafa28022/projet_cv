@@ -1,7 +1,8 @@
-venv/
-data/raw/*.mp4
-data/raw/*.avi
-data/processed/frames/
-*.pyc
+data/
 __pycache__/
+*.pyc
+*.h5
+*.pt
 .ipynb_checkpoints/
+*.egg-info/
+.env
