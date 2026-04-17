@@ -54,7 +54,11 @@ for action_id, action_data in actions.items():
                 continue
             try:
                 frame_num = int(frame_file.split('_f')[-1].replace('.jpg', ''))
-                real_frame = frame_num * 6
+                sampling_rate = 3
+                fps = 30
+                interval = int(fps / sampling_rate)
+
+                real_frame = frame_num * interval
 
                 if start <= real_frame <= end:
                     src = os.path.join(frames_dir, frame_file)
