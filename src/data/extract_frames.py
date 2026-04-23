@@ -1,111 +1,141 @@
 """
-Extraction des frames avec sampling intelligent et équilibrage des classes.
-Stratégie : 1 frame toutes les 15 frames + cap par classe pour équilibrage.
+Extraction des frames depuis le fichier mosaic RGB.
+Le mosaic contient les 3 cameras dans une seule vidéo :
+    - Hands : frame[0:360,    0:640]   haut gauche
+    - Face  : frame[360:720,  0:640]   bas gauche
+    - Body  : frame[360:720, 640:1280] bas droite
+
+Frame offsets (décalage entre caméras) depuis le JSON streams :
+    - Face  : 0
+    - Body  : 3
+    - Hands : 18
 """
 
 import cv2
 import pandas as pd
 from pathlib import Path
-from collections import defaultdict
 
 
-SAMPLE_EVERY_N  = 15    # 1 frame toutes les 15 = ~1.67 fps
-MAX_PER_CLASS   = 600   # cap par classe ET par session pour équilibrage
-IMG_SIZE        = 224   # taille standard pour CNN (ResNet, EfficientNet...)
-JPEG_QUALITY    = 92    # qualité image
+SAMPLE_EVERY_N = 5
+IMG_SIZE       = 224
+JPEG_QUALITY   = 92
+
+# Régions de crop dans le mosaic [y1:y2, x1:x2]
+REGIONS = {
+    'hands' : (0,   360,  0,   640),
+    'face'  : (360, 720,  0,   640),
+    'body'  : (360, 720,  640, 1280),
+}
+
+# Décalage de frames entre caméras (depuis JSON streams)
+FRAME_OFFSETS = {
+    'face'  : 0,
+    'body'  : 3,
+    'hands' : 18,
+}
 
 
-def extract_frames(video_path: str, annotations_csv: str,
-                   session_name: str, output_dir: str):
-
+def extract_mosaic_frames(video_path: str, annotations_csv: str,
+                          session_name: str, output_dir: str):
+    """
+    Lit le mosaic et extrait les 3 régions pour chaque frame annotée.
+    Sauvegarde dans :
+        output_dir/
+            body/  safe_drive/ drinking/ reach_side/
+            face/  safe_drive/ drinking/ reach_side/
+            hands/ safe_drive/ drinking/ reach_side/
+    """
     output_dir = Path(output_dir)
-    classes = ['safe_drive', 'drinking', 'reach_side']
-    for cls in classes:
-        (output_dir / cls).mkdir(parents=True, exist_ok=True)
+    classes    = ['safe_drive', 'drinking', 'reach_side']
 
-    # Charge annotations de cette session uniquement
-    df = pd.read_csv(annotations_csv)
+    # Crée les dossiers
+    for stream in REGIONS:
+        for cls in classes:
+            (output_dir / stream / cls).mkdir(parents=True, exist_ok=True)
+
+    # Charge les annotations
+    df         = pd.read_csv(annotations_csv)
     df_session = df[df['session'] == session_name].copy()
     frame_to_label = dict(zip(df_session['frame_id'], df_session['label']))
 
-    # Pré-filtre : garde seulement 1 frame sur SAMPLE_EVERY_N
+    # Sampling
     sampled_frames = {
         fid: lbl
-        for i, (fid, lbl) in enumerate(sorted(frame_to_label.items()))
+        for fid, lbl in sorted(frame_to_label.items())
         if fid % SAMPLE_EVERY_N == 0
     }
 
-    # Cap par classe : max MAX_PER_CLASS frames par classe
-    class_frames = defaultdict(list)
-    for fid, lbl in sorted(sampled_frames.items()):
-        class_frames[lbl].append(fid)
-
-    final_frames = {}
-    for cls, fids in class_frames.items():
-        kept = fids[:MAX_PER_CLASS]
-        for fid in kept:
-            final_frames[fid] = cls
-
-    # Stats avant extraction
-    print(f'\n=== Session {session_name} ===')
-    print(f'Frames annotées totales  : {len(frame_to_label)}')
-    print(f'Après sampling (/{SAMPLE_EVERY_N}) : {len(sampled_frames)}')
-    print(f'Après cap ({MAX_PER_CLASS}/classe) : {len(final_frames)}')
+    print(f'\n=== Session {session_name} | Mosaic ===')
+    print(f'Frames annotées  : {len(frame_to_label)}')
+    print(f'Après sampling   : {len(sampled_frames)}')
     for cls in classes:
-        count = sum(1 for l in final_frames.values() if l == cls)
+        count = sum(1 for l in sampled_frames.values() if l == cls)
         print(f'  {cls:20s} : {count}')
 
-    if not final_frames:
+    if not sampled_frames:
         print('Aucune frame à extraire.')
         return
 
-    # Extraction
+    # Ouvre le mosaic
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise ValueError(f'Impossible d ouvrir : {video_path}')
 
-    saved    = 0
-    frame_id = 0
-    max_frame = max(final_frames.keys())
+    saved     = 0
+    frame_id  = 0
+    max_frame = max(sampled_frames.keys())
 
     while frame_id <= max_frame:
         ret, frame = cap.read()
         if not ret:
             break
 
-        if frame_id in final_frames:
-            label = final_frames[frame_id]
-            frame_resized = cv2.resize(frame, (IMG_SIZE, IMG_SIZE))
-            filename  = f'{session_name}_frame_{frame_id:05d}.jpg'
-            save_path = output_dir / label / filename
-            cv2.imwrite(str(save_path), frame_resized,
-                        [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+        if frame_id in sampled_frames:
+            label = sampled_frames[frame_id]
+
+            # Extrait et sauvegarde chaque région
+            for stream, (y1, y2, x1, x2) in REGIONS.items():
+                crop          = frame[y1:y2, x1:x2]
+                crop_resized  = cv2.resize(crop, (IMG_SIZE, IMG_SIZE))
+                filename      = f'{session_name}_frame_{frame_id:05d}.jpg'
+                save_path     = output_dir / stream / label / filename
+                cv2.imwrite(str(save_path), crop_resized,
+                            [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
             saved += 1
 
         frame_id += 1
 
     cap.release()
-    print(f'Extraction terminée : {saved} images sauvegardées')
+    print(f'Extraction terminée : {saved} frames × 3 streams = {saved*3} images')
 
 
 def get_extraction_stats(output_dir: str):
     output_dir = Path(output_dir)
     print('\n=== Dataset final ===')
-    total = 0
-    for cls_dir in sorted(output_dir.iterdir()):
-        if cls_dir.is_dir():
-            count = len(list(cls_dir.glob('*.jpg')))
-            bar   = '█' * (count // 20)
-            print(f'  {cls_dir.name:20s} : {count:4d}  {bar}')
-            total += count
-    print(f'  {"TOTAL":20s} : {total}')
+    for stream in ['body', 'face', 'hands']:
+        print(f'\n  Stream : {stream}')
+        total = 0
+        for cls_dir in sorted((output_dir / stream).iterdir()):
+            if cls_dir.is_dir():
+                count = len(list(cls_dir.glob('*.jpg')))
+                bar   = '█' * (count // 20)
+                print(f'    {cls_dir.name:20s} : {count:4d}  {bar}')
+                total += count
+        print(f'    {"TOTAL":20s} : {total}')
 
 
 if __name__ == '__main__':
-    extract_frames(
-        video_path='data/raw/gA_3_s1_rgb_body.mp4',
+    # Supprime les anciennes frames si elles existent
+    import shutil
+    old_dir = Path('data/processed/frames_mosaic')
+    if old_dir.exists():
+        shutil.rmtree(old_dir)
+        print('Ancien dossier supprimé')
+
+    extract_mosaic_frames(
+        video_path='data/raw/gA_3_s1_rgb_mosaic.avi',
         annotations_csv='data/processed/distraction_annotations.csv',
         session_name='s1',
-        output_dir='data/processed/frames',
+        output_dir='data/processed/frames_mosaic',
     )
-    get_extraction_stats('data/processed/frames')
+    get_extraction_stats('data/processed/frames_mosaic')

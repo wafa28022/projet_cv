@@ -1,0 +1,17 @@
+CFG = {
+    'video_path'      : 'data/raw/gA_3_s1_rgb_mosaic.avi',
+    'annotations_csv' : 'data/processed/distraction_annotations.csv',
+    'session_name'    : 's1',
+    'img_size'        : (224, 224),
+    'seq_len'         : 5,
+    'sample_every'    : 5,
+    'val_split'       : 0.15,
+    'test_split'      : 0.15,
+    'batch_size'      : 8,
+    'num_workers'     : 0,
+    'epochs'          : 30,
+    'lr'              : 1e-4,
+    'weight_decay'    : 1e-4,
+    'num_classes'     : 3,
+    'checkpoint_dir'  : 'results/checkpoints',
+}
