@@ -1,69 +1,53 @@
 import cv2
 import os
 
-# ==============================
-# PARAMÈTRES
-# ==============================
+# ✅ Les 2 vidéos mosaic
+videos = [
+    {
+        "path": r"C:\Users\msi\Desktop\ma-part\dmd\gE\28\s4",
+        "file": "gE_28_s4_2019-03-21T10;19;50+01;00_rgb_mosaic.avi"
+    },
+    {
+        "path": r"C:\Users\msi\Desktop\ma-part\dmd\gB\10\s2",
+        "file": "gB_10_s2_2019-03-11T15;15;21+01;00_rgb_mosaic.avi"
+    }
+]
 
-video_dir = r"C:\Users\msi\Desktop\ma-part\dmd\gE\28\s4"
 output_dir = r"C:\projet_cv\data\frames_s4"
-sampling_rate = 3  # 🔥 nombre de frames par seconde
-
-# ==============================
-# CRÉATION DOSSIER
-# ==============================
-
 os.makedirs(output_dir, exist_ok=True)
 
-# ==============================
-# TRAITEMENT VIDÉOS
-# ==============================
+for video_info in videos:
+    video_path = os.path.join(video_info["path"], video_info["file"])
 
-for video_file in os.listdir(video_dir):
+    if not os.path.exists(video_path):
+        print(f"❌ Fichier introuvable : {video_info['file']}")
+        continue
 
-    if video_file.endswith(('.mp4', '.avi', '.mov')):
+    video_name    = os.path.splitext(video_info["file"])[0]
+    frames_folder = os.path.join(output_dir, video_name)
+    os.makedirs(frames_folder, exist_ok=True)
 
-        video_path = os.path.join(video_dir, video_file)
-        video_name = os.path.splitext(video_file)[0]
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    print(f"Extraction de : {video_info['file']} ({fps:.2f} FPS)")
 
-        frames_folder = os.path.join(output_dir, video_name)
-        os.makedirs(frames_folder, exist_ok=True)
+    frame_count = 0
+    saved_count = 0
 
-        cap = cv2.VideoCapture(video_path)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-        fps = cap.get(cv2.CAP_PROP_FPS)
+        interval = int(fps / 5)
+        if frame_count % interval == 0:
+            frame_name = f"{video_name}_f{saved_count:05d}.jpg"
+            cv2.imwrite(os.path.join(frames_folder, frame_name), frame)
+            saved_count += 1
 
-        if fps == 0:
-            print(f"❌ Impossible de lire FPS pour {video_file}")
-            continue
+        frame_count += 1
 
-        interval = int(fps / sampling_rate)
+    cap.release()
+    print(f"✅ {saved_count} frames sauvegardées de {video_info['file']}")
 
-        print(f"\n🎬 Vidéo : {video_file}")
-        print(f"FPS : {fps:.2f} | Interval : {interval}")
-
-        frame_count = 0
-        saved_count = 0
-
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            if frame_count % interval == 0:
-
-                second = int(frame_count / fps)
-
-                frame_name = f"{video_name}_sec{second:04d}_f{saved_count:05d}.jpg"
-                frame_path = os.path.join(frames_folder, frame_name)
-
-                cv2.imwrite(frame_path, frame)
-                saved_count += 1
-
-            frame_count += 1
-
-        cap.release()
-
-        print(f"✅ {saved_count} frames sauvegardées")
-
-print("\n🎉 Extraction terminée !")
+print("\n✅ Extraction terminée !")

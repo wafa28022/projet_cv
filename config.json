@@ -1,0 +1,8 @@
+{
+    "dataset_path": "C:\\projet_cv\\data\\organized_s4\\mosaic",
+    "labels_path":  "C:\\projet_cv\\data\\frame_labels.json",
+    "img_size":     [224, 224],
+    "val_split":    0.2,
+    "batch_size":   32,
+    "num_workers":  0
+}
