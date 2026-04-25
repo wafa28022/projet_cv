@@ -6,3 +6,54 @@ __pycache__/
 .ipynb_checkpoints/
 *.egg-info/
 .env
+results/checkpoints/
+results/plots/
+data/raw/*.mp4
+data/raw/*.avi
+data/processed/
+cat > .gitignore << 'EOF'
+# ========== DONNÉES ==========
+data/
+datasets/
+*.csv
+*.zip
+
+# ========== MODÈLES ENTRAÎNÉS (LOURDS) ==========
+results/
+checkpoints/
+models/checkpoints/
+src/models/checkpoints/
+*.pth
+*.pt
+*.h5
+*.pkl
+*.pickle
+
+# ========== PYTHON ==========
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+
+# ========== ENVIRONNEMENT ==========
+.env
+venv/
+.venv/
+env/
+ENV/
+
+# ========== SYSTÈME ==========
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ========== LOGS ==========
+logs/
+*.log
+EOF
